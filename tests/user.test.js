@@ -1,27 +1,9 @@
 const app = require("../src/app");
 const request = require("supertest");
 const User = require("../src/models/user");
-const mongoose = require("mongoose");
-const jwt = require("jsonwebtoken");
+const { userOne, setupDatabase } = require("./fixtures/db");
 
-const testAgent = request(app);
-const userOneId = new mongoose.Types.ObjectId();
-const userOne = {
-  _id: userOneId,
-  name: "Rishabh",
-  email: "kk@gmail.com",
-  password: "5621341pass",
-  tokens: [
-    {
-      token: jwt.sign({ _id: userOneId }, process.env.JWT_SECRET),
-    },
-  ],
-};
-
-beforeEach(async () => {
-  await User.deleteMany();
-  await new User(userOne).save();
-});
+beforeEach(setupDatabase);
 
 test("Should Sign up User", async () => {
   const response = await request(app)
@@ -100,7 +82,7 @@ test("Should delete account for authenticated user", async () => {
     .set("Authorization", `Bearer ${userOne.tokens[0].token}`)
     .send()
     .expect(200);
-  const user = await User.findById(userOneId);
+  const user = await User.findById(userOne._id);
   expect(user).toBeNull();
 });
 
@@ -114,12 +96,12 @@ test("Should upload avatar image", async () => {
     .set("Authorization", `Bearer ${userOne.tokens[0].token}`)
     .attach("avatar", "tests/fixtures/my_pic.jpeg")
     .expect(200);
-  const user = await User.findById(userOneId);
+  const user = await User.findById(userOne._id);
   expect(user.avatar).toEqual(expect.any(Buffer));
 });
 
 test("Should update valid user fields", async () => {
-  const { body } = await testAgent
+  const { body } = await request(app)
     .patch("/users/me/")
     .set("Authorization", `Bearer ${userOne.tokens[0].token}`)
     .send({
@@ -127,13 +109,13 @@ test("Should update valid user fields", async () => {
       password: "changeme123",
     })
     .expect(200);
-  const user = await User.findById(userOneId);
+  const user = await User.findById(userOne._id);
   expect(body.name).toBe("Rishi");
   expect(user.name).toBe("Rishi");
 });
 
 test("Should not update invalid user fields", async () => {
-  const { body } = await testAgent
+  const { body } = await request(app)
     .patch("/users/me/")
     .set("Authorization", `Bearer ${userOne.tokens[0].token}`)
     .send({
